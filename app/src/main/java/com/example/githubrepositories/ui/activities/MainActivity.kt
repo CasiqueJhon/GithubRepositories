@@ -3,38 +3,20 @@ package com.example.githubrepositories.ui.activities
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
-import android.os.Build
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
-import android.util.Log
-import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AlertDialog
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.githubrepositories.R
 import com.example.githubrepositories.api.RepositoryRetriever
 import com.example.githubrepositories.data.RepoResult
 import kotlinx.android.synthetic.main.activity_main.*
-import retrofit2.Call
-import retrofit2.Callback
-import retrofit2.Response
+import kotlinx.coroutines.*
 
 class MainActivity : AppCompatActivity() {
 
     companion object{
         const val TAG = "MainActivity"
-    }
-    private val repoRetriever= RepositoryRetriever()
-    private val callback = object :Callback<RepoResult> {
-        override fun onResponse(call: Call<RepoResult>, response: Response<RepoResult>) {
-            response.isSuccessful.let {
-                val resultList = RepoResult(response.body()?.items ?: emptyList())
-                repoList.adapter = RepoListAdapter(resultList)
-            }
-        }
-
-        override fun onFailure(call: Call<RepoResult>, t: Throwable) {
-            Log.i(TAG, "Problem calling Github API {${t.localizedMessage}")
-        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -42,9 +24,19 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         repoList.layoutManager = LinearLayoutManager(this)
+        initConnectivity()
+    }
+    private fun isNetworkConnected(): Boolean {
+        val connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val activeNetwork = connectivityManager.activeNetwork
+        val networkCapabilities = connectivityManager.getNetworkCapabilities(activeNetwork)
+        return networkCapabilities != null &&
+                networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+    }
 
+    private fun initConnectivity() {
         if (isNetworkConnected()) {
-            repoRetriever.getRepositories(callback)
+            retrieveRepositories()
         } else {
             AlertDialog.Builder(this)
                 .setTitle("No Internet Connection")
@@ -53,14 +45,28 @@ class MainActivity : AppCompatActivity() {
                 .setIcon(android.R.drawable.ic_dialog_alert).show()
         }
     }
-    private fun isNetworkConnected(): Boolean {
-        val connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
 
-        val activeNetwork = connectivityManager.activeNetwork
-
-        val networkCapabilities = connectivityManager.getNetworkCapabilities(activeNetwork)
-
-        return networkCapabilities != null &&
-                networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+    /**
+     * Coroutines process
+     * 1 Create Job() to get control
+     * 2 next handle exception if we have any
+     * 3 next set the scope where the Dispatchers if going to work
+     * 4 finally set the result.
+     *
+     * */
+    private fun retrieveRepositories() {
+        val mainActivityJob = Job()
+        val errorHandler : CoroutineExceptionHandler = CoroutineExceptionHandler {_, exception ->
+            AlertDialog.Builder(this)
+                .setTitle("Error")
+                .setMessage(exception.localizedMessage)
+                .setPositiveButton(android.R.string.ok) {_, _ ->}
+                .setIcon(android.R.drawable.ic_dialog_alert).show()
+        }
+        val coroutineScope : CoroutineScope = CoroutineScope(mainActivityJob + Dispatchers.Main)
+        coroutineScope.launch(errorHandler) {
+            val resultList : RepoResult = RepositoryRetriever().getRepositories()
+            repoList.adapter = RepoListAdapter(resultList)
+        }
     }
 }

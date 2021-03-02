@@ -1,7 +1,5 @@
 package com.example.githubrepositories.data
 
-import android.content.ClipData
-
 data class RepoResult(val items: List<Item>) {
 
     data class Item(
