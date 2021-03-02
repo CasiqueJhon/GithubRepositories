@@ -5,6 +5,7 @@ import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import android.util.Log
 import androidx.appcompat.app.AlertDialog
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.githubrepositories.R
@@ -28,8 +29,10 @@ class MainActivity : AppCompatActivity() {
     }
     private fun isNetworkConnected(): Boolean {
         val connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        Log.i(TAG, "network manager $connectivityManager")
         val activeNetwork = connectivityManager.activeNetwork
         val networkCapabilities = connectivityManager.getNetworkCapabilities(activeNetwork)
+        Log.i(TAG, "network $activeNetwork")
         return networkCapabilities != null &&
                 networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
     }
@@ -66,6 +69,7 @@ class MainActivity : AppCompatActivity() {
         val coroutineScope : CoroutineScope = CoroutineScope(mainActivityJob + Dispatchers.Main)
         coroutineScope.launch(errorHandler) {
             val resultList : RepoResult = RepositoryRetriever().getRepositories()
+            Log.i(TAG, "mainThread $coroutineScope")
             repoList.adapter = RepoListAdapter(resultList)
         }
     }
